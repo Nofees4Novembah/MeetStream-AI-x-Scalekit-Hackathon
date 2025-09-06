@@ -1,15 +1,4 @@
 [project]
-<<<<<<< HEAD
-name = "meetstream-ai-x-scalekit-hackathon"
-version = "0.1.0"
-description = "Add your description here"
-requires-python = ">=3.13"
-dependencies = [
-    "fastapi>=0.135.2",
-    "httpx>=0.28.1",
-    "python-dotenv>=1.2.2",
-    "uvicorn>=0.42.0",
-=======
 name = "real-time-agents"
 version = "0.1.0"
 description = "Add your description here"
@@ -21,5 +10,13 @@ dependencies = [
     "openai-agents[voice]>=0.2.11",
     "uvicorn>=0.35.0",
     "websockets>=15.0.1",
->>>>>>> 0f53bb0 (Meetstream Agents)
 ]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.0.2",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
