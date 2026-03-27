@@ -387,6 +387,33 @@ wheels = [
 ]
 
 [[package]]
+name = "meetstream-bridge"
+version = "0.2.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "fastapi" },
+    { name = "httpx" },
+    { name = "ipython" },
+    { name = "numpy" },
+    { name = "openai-agents", extra = ["voice"] },
+    { name = "python-dotenv" },
+    { name = "uvicorn" },
+    { name = "websockets" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "fastapi", specifier = ">=0.116.1" },
+    { name = "httpx", specifier = ">=0.27.0" },
+    { name = "ipython", specifier = ">=9.5.0" },
+    { name = "numpy", specifier = ">=2.0.0" },
+    { name = "openai-agents", extras = ["voice"], specifier = ">=0.2.11" },
+    { name = "python-dotenv", specifier = ">=1.1.1" },
+    { name = "uvicorn", specifier = ">=0.35.0" },
+    { name = "websockets", specifier = ">=15.0.1" },
+]
+
+[[package]]
 name = "numpy"
 version = "2.3.2"
 source = { registry = "https://pypi.org/simple" }
@@ -692,6 +719,7 @@ wheels = [
 ]
 
 [[package]]
+<<<<<<< HEAD
 name = "real-time-agents"
 version = "0.1.0"
 source = { virtual = "." }
@@ -725,6 +753,8 @@ dev = [
 ]
 
 [[package]]
+=======
+>>>>>>> f403a71 (refactor(bridge): layered MeetStream ↔ Realtime stack, MCP config, and stable TTS around tools)
 name = "referencing"
 version = "0.36.2"
 source = { registry = "https://pypi.org/simple" }

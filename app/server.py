@@ -1,14 +1,27 @@
-import asyncio
-import base64
-import json
-import logging
-import os
-import struct
-from contextlib import asynccontextmanager
-from typing import Any, Dict, Optional
+"""
+FastAPI application: wires HTTP/WebSocket routes and static assets.
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse
+Architecture: https://docs.meetstream.ai/guides/get-started/bridge-server-architecture
+
+Layout
+------
+
+``app/meetstream/`` — MeetStream protocol (audio frames, speaker filter, outbound JSON, WS loops).
+
+``app/realtime/`` — OpenAI Realtime session, MCP preconnect, event serialization, model→MeetStream pump.
+
+``app/routes/`` — Thin FastAPI routers (pages + websockets).
+
+``app/agent.py`` — Agent definition, tools, MCP wiring (LLM-facing only).
+"""
+
+from __future__ import annotations
+
+import os
+from contextlib import asynccontextmanager
+
+from dotenv import load_dotenv
+from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from typing_extensions import assert_never
 from starlette.websockets import WebSocketState
@@ -18,10 +31,8 @@ from starlette.websockets import WebSocketState
 from agents.realtime import RealtimeRunner, RealtimeSession, RealtimeSessionEvent
 try:
     from .agent import get_starting_agent  # when used as a package
-    from . import extractor
 except Exception:
-    from app.agent import get_starting_agent     # when run directly
-    import app.extractor as extractor
+    from agent import get_starting_agent     # when run directly
 
 import os, numpy as np
 try:
@@ -397,6 +408,7 @@ manager = BridgeManager()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    load_dotenv()
     yield
 
 app = FastAPI(lifespan=lifespan)
@@ -551,44 +563,14 @@ async def meetstream_audio_bind(websocket: WebSocket):
         ...
 
 
-# ----- Task management endpoints -------------------------------------------------
-@app.get("/tasks/pending")
-async def get_pending_tasks():
-    return extractor.PENDING_TASKS
-
-
-@app.post("/tasks/clear")
-async def clear_pending_tasks():
-    extractor.PENDING_TASKS.clear()
-    return {"status": "cleared"}
-
-
-@app.post("/tasks/{task_id}/approve")
-async def approve_task(task_id: str):
-    for task in extractor.PENDING_TASKS:
-        if task["id"] == task_id:
-            task["status"] = "approved"
-            return {"status": "approved", "task": task}
-    raise HTTPException(status_code=404, detail="Task not found")
-
-
-@app.post("/tasks/{task_id}/reject")
-async def reject_task(task_id: str):
-    for task in extractor.PENDING_TASKS:
-        if task["id"] == task_id:
-            task["status"] = "rejected"
-            return {"status": "rejected", "task": task}
-    raise HTTPException(status_code=404, detail="Task not found")
-
-
 # ----- Static UI (optional) ------------------------------------------------------
-app.mount("/", StaticFiles(directory="app/static", html=True), name="static")
+app.mount("/", StaticFiles(directory="static", html=True), name="static")
 
 @app.get("/")
 async def index():
-    return FileResponse("app/static/index.html")
+    return FileResponse("static/index.html")
 
 # ----- Entrypoint ----------------------------------------------------------------
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("combined_server:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("server:app", host="0.0.0.0", port=8000, reload=True)
