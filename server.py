@@ -1,6 +1,8 @@
 import json
+import os
 from datetime import datetime, timezone
 
+import httpx
 import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -13,10 +15,37 @@ app = FastAPI()
 # In-memory bot_id -> transcript_id mapping, populated by send_bot.py via /register_bot
 bot_transcript_map: dict[str, str] = {}
 
+BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:3000")
+
 
 def log(prefix: str, msg: str) -> None:
     ts = datetime.now(timezone.utc).strftime("%H:%M:%S")
     print(f"[{ts}] [{prefix}] {msg}")
+
+
+async def push_status(status: str) -> None:
+    """Tell the dashboard backend what the bot is currently doing."""
+    try:
+        async with httpx.AsyncClient() as client:
+            await client.post(f"{BACKEND_URL}/internal/bot_status", json={"status": status})
+    except Exception as e:
+        log("SERVER", f"Could not update backend status: {e}")
+
+
+async def push_transcript(transcript: list) -> None:
+    """Forward each transcript segment to the dashboard backend."""
+    async with httpx.AsyncClient() as client:
+        for segment in transcript:
+            payload = {
+                "speakerName": segment.get("speaker", "Unknown"),
+                "transcript":  segment.get("transcript", ""),
+                "timestamp":   segment.get("absolute_start_time") or segment.get("start_time") or 0,
+                "words":       segment.get("words", []),
+            }
+            try:
+                await client.post(f"{BACKEND_URL}/internal/transcript", json=payload)
+            except Exception as e:
+                log("SERVER", f"Could not push segment to backend: {e}")
 
 
 @app.post("/webhooks/meetstream")
@@ -28,10 +57,13 @@ async def meetstream_webhook(request: Request) -> JSONResponse:
 
     if event_type == "bot.joining":
         log("WEBHOOK", "Bot is connecting...")
+        await push_status("joining")
     elif event_type == "bot.inmeeting":
         log("WEBHOOK", "Bot is live and recording")
+        await push_status("inmeeting")
     elif event_type == "bot.stopped":
         log("WEBHOOK", "Meeting ended, waiting for transcript...")
+        await push_status("stopped")
     elif event_type == "transcription.processed":
         # Log full payload so we can confirm field names from the real response
         log("WEBHOOK", f"transcription.processed full payload: {json.dumps(payload, indent=2)}")
@@ -43,6 +75,7 @@ async def meetstream_webhook(request: Request) -> JSONResponse:
             log("WEBHOOK", f"Resolved transcript_id={transcript_id} for bot_id={bot_id}, fetching...")
             transcript = await fetch_transcript(transcript_id)
             print(json.dumps(transcript, indent=2))
+            await push_transcript(transcript)
             # TODO: swap {} for real extraction output once Person 2 is ready
             # e.g. extraction = await extract_actions(transcript)
             await dispatcher.dispatch({})

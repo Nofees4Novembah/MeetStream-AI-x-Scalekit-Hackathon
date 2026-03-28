@@ -63,6 +63,15 @@ async def websocket_endpoint(ws: WebSocket):
     except WebSocketDisconnect:
         manager.disconnect(ws)
 
+# ── Bridge posts bot lifecycle status here ──────────────────────────────────
+@app.post("/internal/bot_status")
+async def receive_bot_status(request: Request):
+    body = await request.json()
+    status = body.get("status", "unknown")
+    session["bot_status"] = status
+    await manager.broadcast({"type": "bot_status", "status": status})
+    return {"ok": True}
+
 # ── Bridge posts transcript chunks here ─────────────────────────────────────
 @app.post("/internal/transcript")
 async def receive_transcript(request: Request):

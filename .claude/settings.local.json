@@ -17,7 +17,10 @@
       "Bash(grep -E \"\\\\.\\(py\\)$\")",
       "Bash(xargs grep:*)",
       "Bash(find C:UsersquinnDocumentsmeetstream-hackathonMeetStream-AI-x-Scalekit-Hackathon -type f \\\\\\(-name *.md -o -name *.txt -o -name example* -o -name demo* \\\\\\))",
-      "Bash(grep -E \"\\\\.\\(proto|py\\)$\")"
+      "Bash(grep -E \"\\\\.\\(proto|py\\)$\")",
+      "Bash(.venv/Scripts/pip install:*)",
+      "Bash(.venv/Scripts/python.exe -m pip install openai)",
+      "Bash(.venv/Scripts/python.exe -m ensurepip)"
     ]
   }
 }
