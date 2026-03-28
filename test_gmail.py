@@ -10,7 +10,7 @@ import auth
 from connectors.gmail_followup import run, STUB_USER_ID
 
 TEST_EXTRACTION = {
-    "recipient_email": "YOUR_EMAIL_HERE",  # fill in before running
+    "recipient_email": "joeswanson1092@gmail.com",  # fill in before running
     "recipient_name": "Test Recipient",
     "summary": "We discussed the Q2 roadmap and assigned action items.",
     "action_items": [
