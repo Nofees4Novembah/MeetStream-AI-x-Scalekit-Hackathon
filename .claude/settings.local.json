@@ -5,7 +5,14 @@
       "Bash(pip show:*)",
       "Bash(pip install:*)",
       "Bash(python -m uv init --no-readme)",
-      "Bash(python -m uv add fastapi uvicorn httpx python-dotenv)"
+      "Bash(python -m uv add fastapi uvicorn httpx python-dotenv)",
+      "Bash(python -m uv add scalekit)",
+      "Bash(pip index:*)",
+      "Bash(pip search:*)",
+      "Bash(python -m uv pip install scalekit --dry-run)",
+      "WebFetch(domain:pypi.org)",
+      "WebSearch",
+      "Bash(python -m uv add scalekit-sdk-python)"
     ]
   }
 }

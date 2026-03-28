@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from scalekit import ScalekitClient # type: ignore
+from scalekit import ScalekitClient
 from typing import Any
 
 
