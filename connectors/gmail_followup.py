@@ -1,13 +1,36 @@
 """
-Gmail follow-up connector — sends a post-meeting summary email via Scalekit.
+Gmail follow-up connector — sends a post-meeting summary email.
 
-Scalekit proxies the Gmail API call using the user's connected account,
-so we never handle OAuth tokens directly.
+Scalekit manages the OAuth connection. We fetch the access token from the
+connected account and call the Gmail API directly, since no gmail_send_email
+execute_tool exists in this Scalekit environment.
 """
+
+import base64
+from email.mime.text import MIMEText
+
+import httpx
 
 import auth
 
 STUB_USER_ID = "hackathon-user"
+GMAIL_SEND_URL = "https://gmail.googleapis.com/gmail/v1/users/me/messages/send"
+
+
+def _get_access_token() -> str | None:
+    account = auth.connect_user(STUB_USER_ID, connection_name="gmail")
+    try:
+        return account.authorization_details["oauth_token"]["access_token"]
+    except (KeyError, TypeError):
+        return None
+
+
+def _build_mime(recipient: str, subject: str, body: str) -> str:
+    msg = MIMEText(body)
+    msg["to"] = recipient
+    msg["subject"] = subject
+    # Gmail API requires base64url encoding (no padding)
+    return base64.urlsafe_b64encode(msg.as_bytes()).decode().rstrip("=")
 
 
 def _build_body(extraction: dict) -> str:
@@ -48,22 +71,25 @@ async def run(extraction: dict) -> None:
         print(f"[GMAIL] Not authorized — auth link: {auth_status['auth_link']}")
         return
 
+    access_token = _get_access_token()
+    if not access_token:
+        print("[GMAIL] Could not retrieve access token from connected account")
+        return
+
     subject = "Follow-up: Meeting Summary & Action Items"
-    body = _build_body(extraction)
+    raw = _build_mime(recipient, subject, _build_body(extraction))
 
     try:
-        # Scalekit's execute_tool proxies the call using the user's connected Gmail account.
-        # tool_name="gmail_send_email" sends via Gmail API — no token handling needed.
-        actions = auth.get_actions()
-        result = actions.execute_tool(
-            tool_name="gmail_send_email",
-            identifier=STUB_USER_ID,
-            tool_input={
-                "to": recipient,
-                "subject": subject,
-                "body": body,
-            },
-        )
-        print(f"[GMAIL] Follow-up email sent to {recipient} (execution_id={result.execution_id})")
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                GMAIL_SEND_URL,
+                headers={"Authorization": f"Bearer {access_token}"},
+                json={"raw": raw},
+            )
+
+        if resp.status_code == 200:
+            print(f"[GMAIL] Follow-up email sent to {recipient}")
+        else:
+            print(f"[GMAIL] Gmail API error {resp.status_code}: {resp.text}")
     except Exception as e:
         print(f"[GMAIL] Failed to send email: {e}")
