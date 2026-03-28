@@ -1,5 +1,5 @@
 """
-HubSpot connector — updates contact notes and creates deals from meeting data.
+HubSpot connector — creates deals and updates contacts from meeting data.
 
 Scalekit proxies the HubSpot API call using the user's connected account.
 """
@@ -19,10 +19,7 @@ async def run(extraction: dict) -> None:
 
     actions = auth.get_actions()
 
-    # Update contact if we have one
     await _update_contact(actions, extraction)
-
-    # Create a deal if extraction includes deal info
     await _create_deal(actions, extraction)
 
 
@@ -33,7 +30,6 @@ async def _update_contact(actions, extraction: dict) -> None:
         return
 
     summary = extraction.get("summary", "")
-    participants = extraction.get("participants", [])
 
     try:
         result = actions.execute_tool(
@@ -42,8 +38,8 @@ async def _update_contact(actions, extraction: dict) -> None:
             tool_input={
                 "contact_id": contact_id,
                 "props": {
-                    "hs_meeting_body": summary,
-                    "notes_last_updated": ", ".join(participants),
+                    "hs_lead_status": "IN_PROGRESS",
+                    "website": summary[:100] if summary else "",
                 },
             },
         )
