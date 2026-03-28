@@ -21,7 +21,8 @@
       "Bash(.venv/Scripts/pip install:*)",
       "Bash(.venv/Scripts/python.exe -m pip install openai)",
       "Bash(.venv/Scripts/python.exe -m ensurepip)",
-      "Bash(uv run:*)"
+      "Bash(uv run:*)",
+      "Bash(find /c/Users/quinn/Documents/meetstream-hackathon/MeetStream-AI-x-Scalekit-Hackathon -name *.py -path */root/* -o -name server.py -o -name transcript.py -o -name send_bot.py -o -name dispatcher.py)"
     ]
   }
 }

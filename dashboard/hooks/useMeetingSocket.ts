@@ -15,7 +15,7 @@ export function useMeetingSocket() {
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
-    const wsUrl = process.env.NEXT_PUBLIC_BACKEND_WS_URL ?? "ws://localhost:8001/ws";
+    const wsUrl = process.env.NEXT_PUBLIC_BACKEND_WS_URL ?? "ws://localhost:3000/ws";
     const ws = new WebSocket(wsUrl);
 
     ws.onopen  = () => setConnected(true);
@@ -34,6 +34,8 @@ export function useMeetingSocket() {
         }));
       } else if (msg.type === "summary") {
         setSession((prev) => ({ ...prev, summary: msg.summary }));
+      } else if (msg.type === "bot_status") {
+        setSession((prev) => ({ ...prev, bot_status: msg.status }));
       }
     };
 

@@ -51,6 +51,7 @@ export default function Dashboard() {
   const [loadingSummary, setLoadingSummary] = useState(false);
   const [loadingBrief,   setLoadingBrief]   = useState(false);
   const [meetingLink,    setMeetingLink]    = useState("");
+  const [recipientEmail, setRecipientEmail] = useState("");
   const [joining,        setJoining]        = useState(false);
   const [joinMsg,        setJoinMsg]        = useState("");
   const [gmailAuth,      setGmailAuth]      = useState<{authorized: boolean; auth_link?: string; error?: string} | null>(null);
@@ -76,6 +77,14 @@ export default function Dashboard() {
     setJoining(true);
     setJoinMsg("");
     try {
+      // Save recipient email first if provided
+      if (recipientEmail.trim()) {
+        await fetch(`${API}/api/set-recipient`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: recipientEmail.trim() }),
+        });
+      }
       const res  = await fetch(`${API}/api/join`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -159,7 +168,7 @@ export default function Dashboard() {
         {/* Join meeting */}
         <div className="bg-white rounded-2xl border border-gray-100 p-4">
           <p className="text-sm font-medium text-gray-700 mb-3">Join a meeting</p>
-          <div className="flex gap-2">
+          <div className="flex gap-2 mb-2">
             <input
               className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm
                 outline-none focus:ring-2 focus:ring-violet-300"
@@ -176,6 +185,14 @@ export default function Dashboard() {
               {joining ? "Sending..." : "Send bot"}
             </button>
           </div>
+          <input
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm
+              outline-none focus:ring-2 focus:ring-violet-300"
+            placeholder="Follow-up email recipient (optional)"
+            type="email"
+            value={recipientEmail}
+            onChange={(e) => setRecipientEmail(e.target.value)}
+          />
           {joinMsg && (
             <p className={`text-xs mt-2 ${joinMsg.startsWith("Error") ? "text-red-500" : "text-green-600"}`}>
               {joinMsg}

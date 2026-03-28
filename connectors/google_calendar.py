@@ -75,7 +75,8 @@ async def run(extraction: dict) -> None:
         due = item["due"]
 
         event_title = f"{title}" + (f" — {owner}" if owner else "")
-        start_datetime = due if due else "2026-03-29T09:00:00Z"
+        from datetime import datetime, timezone, timedelta
+        start_datetime = due if due else (datetime.now(timezone.utc) + timedelta(days=1)).strftime("%Y-%m-%dT09:00:00Z")
 
         try:
             result = actions.execute_tool(
