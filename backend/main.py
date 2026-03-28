@@ -3,9 +3,19 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from openai import OpenAI
 import os
+import sys
+import httpx
 from datetime import datetime
 
 load_dotenv()
+
+# Allow importing auth.py from the project root
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import auth
+
+MEETSTREAM_API_KEY = os.getenv("MEETSTREAM_API_KEY")
+WEBHOOK_BASE_URL   = os.getenv("WEBHOOK_BASE_URL", "")
+STUB_USER_ID       = "hackathon-user"
 
 app = FastAPI()
 
@@ -107,6 +117,84 @@ async def receive_transcript(request: Request):
 
     return {"ok": True}
 
+# ── Join meeting ─────────────────────────────────────────────────────────────
+@app.post("/api/join")
+async def join_meeting(request: Request):
+    body = await request.json()
+    meeting_link = body.get("meeting_link", "").strip()
+    if not meeting_link:
+        return {"error": "meeting_link is required"}, 400
+    if not MEETSTREAM_API_KEY:
+        return {"error": "MEETSTREAM_API_KEY not set in .env"}, 500
+    if not WEBHOOK_BASE_URL:
+        return {"error": "WEBHOOK_BASE_URL not set in .env (start ngrok first)"}, 500
+
+    payload = {
+        "meeting_link": meeting_link,
+        "video_required": False,
+        "bot_name": "Hackathon Notetaker",
+        "callback_url": f"{WEBHOOK_BASE_URL}/webhooks/meetstream",
+        "recording_config": {
+            "transcript": {
+                "provider": {
+                    "deepgram": {
+                        "model": "nova-3",
+                        "language": "en",
+                        "punctuate": True,
+                        "smart_format": True,
+                        "diarize": True,
+                    }
+                }
+            }
+        },
+    }
+
+    async with httpx.AsyncClient() as client:
+        try:
+            resp = await client.post(
+                "https://api.meetstream.ai/api/v1/bots/create_bot",
+                json=payload,
+                headers={"Authorization": f"Token {MEETSTREAM_API_KEY}"},
+                timeout=15,
+            )
+            data = resp.json()
+        except Exception as e:
+            return {"error": f"MeetStream API error: {e}"}, 502
+
+        if not resp.is_success:
+            return {"error": data}, resp.status_code
+
+        bot_id        = data.get("bot_id") or data.get("id")
+        transcript_id = data.get("transcript_id")
+
+        # Register mapping with webhook server (localhost:3001)
+        try:
+            await client.post(
+                "http://localhost:3001/register_bot",
+                json={"bot_id": bot_id, "transcript_id": transcript_id},
+                timeout=5,
+            )
+        except Exception:
+            pass  # Non-fatal — server may not be up yet
+
+    session["bot_status"] = "joining"
+    await manager.broadcast({"type": "bot_status", "status": "joining"})
+    return {"ok": True, "bot_id": bot_id}
+
+
+# ── Gmail auth status ─────────────────────────────────────────────────────────
+@app.get("/api/gmail-status")
+async def gmail_status():
+    try:
+        authorized = auth.is_authorized(STUB_USER_ID, connection_name="gmail")
+        if authorized:
+            return {"authorized": True}
+        link = auth.get_auth_link(STUB_USER_ID, connection_name="gmail")
+        return {"authorized": False, "auth_link": link}
+    except Exception as e:
+        return {"authorized": False, "error": str(e)}
+
+
 # ── Generate summary ─────────────────────────────────────────────────────────
 @app.post("/api/summarize")
 async def summarize():
@@ -117,23 +205,29 @@ async def summarize():
         f"{e['speaker']}: {e['text']}" for e in session["transcript"]
     )
 
-    response = client.chat.completions.create(
-        model="gpt-4o",
-        max_tokens=500,
-        messages=[
-            {
-                "role": "system",
-                "content": "You are a helpful meeting assistant that summarizes transcripts clearly and concisely.",
-            },
-            {
-                "role": "user",
-                "content": (
-                    "Summarize this meeting transcript in 3-4 sentences, "
-                    "then list any action items.\n\n" + full_text
-                ),
-            },
-        ],
-    )
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            max_tokens=500,
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a helpful meeting assistant that summarizes transcripts clearly and concisely.",
+                },
+                {
+                    "role": "user",
+                    "content": (
+                        "Summarize this meeting transcript in 3-4 sentences, "
+                        "then list any action items.\n\n" + full_text
+                    ),
+                },
+            ],
+        )
+    except Exception as e:
+        msg = str(e)
+        if "401" in msg or "invalid_api_key" in msg or "Incorrect API key" in msg:
+            return {"error": "Invalid OpenAI API key. Update OPENAI_API_KEY in .env and restart the backend."}, 400
+        return {"error": f"OpenAI error: {msg}"}, 500
 
     summary = response.choices[0].message.content
     session["summary"] = summary
@@ -153,24 +247,30 @@ async def late_joiner_brief(request: Request):
         f"{e['speaker']}: {e['text']}" for e in session["transcript"]
     )
 
-    response = client.chat.completions.create(
-        model="gpt-4o",
-        max_tokens=200,
-        messages=[
-            {
-                "role": "system",
-                "content": "You are a helpful meeting assistant that writes brief, clear catchups for late joiners.",
-            },
-            {
-                "role": "user",
-                "content": (
-                    f"{name} just joined the meeting late. "
-                    "Write a 2-3 sentence catchup they can read in 10 seconds.\n\n"
-                    "Transcript so far:\n" + full_text
-                ),
-            },
-        ],
-    )
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            max_tokens=200,
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a helpful meeting assistant that writes brief, clear catchups for late joiners.",
+                },
+                {
+                    "role": "user",
+                    "content": (
+                        f"{name} just joined the meeting late. "
+                        "Write a 2-3 sentence catchup they can read in 10 seconds.\n\n"
+                        "Transcript so far:\n" + full_text
+                    ),
+                },
+            ],
+        )
+    except Exception as e:
+        msg = str(e)
+        if "401" in msg or "invalid_api_key" in msg or "Incorrect API key" in msg:
+            return {"error": "Invalid OpenAI API key. Update OPENAI_API_KEY in .env and restart the backend."}, 400
+        return {"error": f"OpenAI error: {msg}"}, 500
 
     return {"brief": response.choices[0].message.content}
 
@@ -184,3 +284,71 @@ async def get_flagged():
 @app.get("/api/session")
 async def get_session():
     return session
+
+# ── Join meeting ─────────────────────────────────────────────────────────────
+@app.post("/api/join")
+async def join_meeting(request: Request):
+    body = await request.json()
+    meeting_link = body.get("meeting_link", "").strip()
+    if not meeting_link:
+        return {"error": "meeting_link is required"}, 400
+    if not MEETSTREAM_API_KEY:
+        return {"error": "MEETSTREAM_API_KEY not set in .env"}, 500
+    if not WEBHOOK_BASE_URL:
+        return {"error": "WEBHOOK_BASE_URL not set in .env — start ngrok first"}, 500
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        resp = await client.post(
+            "https://api.meetstream.ai/api/v1/bots/create_bot",
+            json={
+                "meeting_link": meeting_link,
+                "video_required": False,
+                "bot_name": "Hackathon Notetaker",
+                "callback_url": f"{WEBHOOK_BASE_URL}/webhooks/meetstream",
+                "recording_config": {
+                    "transcript": {
+                        "provider": {
+                            "deepgram": {
+                                "model": "nova-3",
+                                "language": "en",
+                                "punctuate": True,
+                                "smart_format": True,
+                                "diarize": True,
+                            }
+                        }
+                    }
+                },
+            },
+            headers={"Authorization": f"Token {MEETSTREAM_API_KEY}"},
+        )
+
+    if resp.status_code >= 400:
+        return {"error": f"MeetStream error {resp.status_code}: {resp.text}"}, 502
+
+    data = resp.json()
+    bot_id = data.get("bot_id") or data.get("id")
+    transcript_id = data.get("transcript_id")
+
+    # Register mapping with webhook server
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            await client.post(
+                "http://localhost:3001/register_bot",
+                json={"bot_id": bot_id, "transcript_id": transcript_id},
+            )
+    except Exception:
+        pass  # non-fatal — webhook server may not be up yet
+
+    return {"ok": True, "bot_id": bot_id, "transcript_id": transcript_id}
+
+# ── Gmail auth status ─────────────────────────────────────────────────────────
+@app.get("/api/gmail-status")
+async def gmail_status():
+    try:
+        authorized = auth.is_authorized(STUB_USER_ID, connection_name="gmail")
+        if authorized:
+            return {"authorized": True, "auth_link": None}
+        link = auth.get_auth_link(STUB_USER_ID, connection_name="gmail")
+        return {"authorized": False, "auth_link": link}
+    except Exception as e:
+        return {"authorized": False, "auth_link": None, "error": str(e)}

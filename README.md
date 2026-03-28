@@ -1,244 +1,169 @@
-<<<<<<< HEAD
-<<<<<<< HEAD
-# MeetStream AI x Scalekit Hackathon
+# MeetStream AI x Scalekit
 
-Post-call webhook server that receives MeetStream bot lifecycle events and fetches transcripts after meetings end.
+A post-meeting action agent. A bot joins your meeting, records it, and when it ends: transcribes everything, generates a summary, sends a follow-up email via Gmail, and creates calendar events for action items.
 
-## Setup
+---
 
-1. Copy `.env.example` to `.env` and fill in `MEETSTREAM_API_KEY`
-2. Start the server:
-   ```
-   uv run python server.py
-   ```
-3. In another terminal, start ngrok:
-   ```
-   ngrok http 3000
-   ```
-4. Copy the ngrok HTTPS URL into `.env` as `WEBHOOK_BASE_URL`
-5. Restart the server
-6. Send a bot to a meeting:
-   ```
-   uv run python send_bot.py "https://zoom.us/j/your-meeting"
-   ```
-7. Watch the console for webhook events and transcript output
+## How it works
 
-## Files
+```
+Dashboard (port 3002)
+  └─ paste meeting link → "Send bot"
+       └─ Backend (port 3000) → MeetStream API → bot joins meeting
+            └─ Webhook server (port 3001) receives lifecycle events
+                 └─ on meeting end: fetches transcript → runs connectors
+                      ├─ Gmail: sends follow-up email
+                      └─ Google Calendar: creates events for action items
 
-- `server.py` — FastAPI webhook server (port 3000)
-- `transcript.py` — async transcript fetcher
-- `send_bot.py` — CLI script to dispatch a bot to a meeting
-=======
-# Project Setup (with uv)
-=======
-# MeetStream Bridge
->>>>>>> f403a71 (refactor(bridge): layered MeetStream ↔ Realtime stack, MCP config, and stable TTS around tools)
-
-Open-source **FastAPI** bridge between [MeetStream](https://meetstream.ai) and **OpenAI Realtime** via the [OpenAI Agents SDK](https://openai.github.io/openai-agents-python/) (`openai-agents[voice]`). It implements the two WebSocket endpoints and session lifecycle described in the official guide: [Bridge Server Architecture & Session Management](https://docs.meetstream.ai/guides/get-started/bridge-server-architecture).
-
-Use this repo as a starting point: run the server on a public URL (or tunnel), point MeetStream at your `/bridge` and `/bridge/audio` URLs, and supply your own **OpenAI** and **MeetStream** credentials where each service expects them.
-
-## Start here
-
-### 1. Run locally
-
-| Step | Action |
-|------|--------|
-| 1 | `uv sync` |
-| 2 | Copy `.env.example` → `.env` and set `OPENAI_API_KEY` |
-| 3 | Start the server |
-
-```bash
-uv run uvicorn app.server:app --host 0.0.0.0 --port 8000
+Bridge (port 8000) — real-time AI voice agent inside the meeting
 ```
 
-Check [http://localhost:8000/health](http://localhost:8000/health).
+---
 
-### 2. Expose to MeetStream (tunnel)
+## Starting everything
 
-The MeetStream API expects **public** `wss://` URLs, not `localhost`. With the bridge still on port `8000`, start a tunnel in another terminal—for example [ngrok](https://ngrok.com):
+Double-click **`start.bat`** — opens all 5 services in labeled terminal windows.
 
-```bash
-ngrok http 8000
+After ngrok opens:
+1. Copy the `https://xxxx.ngrok.io` URL from the ngrok window
+2. Paste it into `.env` as `WEBHOOK_BASE_URL`
+3. Close and reopen the **Webhook Server :3001** window (it reads the URL on startup)
+
+---
+
+## .env checklist
+
+```
+MEETSTREAM_API_KEY=         # MeetStream dashboard
+WEBHOOK_BASE_URL=           # set after ngrok starts
+SCALEKIT_ENV_URL=           # Scalekit dashboard
+SCALEKIT_CLIENT_ID=         # Scalekit dashboard
+SCALEKIT_CLIENT_SECRET=     # Scalekit dashboard
+OPENAI_API_KEY=             # platform.openai.com/api-keys
+BACKEND_URL=http://localhost:3000
 ```
 
-Use the HTTPS hostname ngrok prints, swap the scheme to `wss://`, and append the paths:
+---
 
-| MeetStream field | Example URL |
-|------------------|-------------|
-| `socket_connection_url` → control | `wss://abc123.ngrok-free.app/bridge` |
-| `live_audio_required` → audio | `wss://abc123.ngrok-free.app/bridge/audio` |
+## Testing the demo
 
-Same host for both; only the path changes.
+1. Run `start.bat`, set `WEBHOOK_BASE_URL`, restart the webhook server window
+2. Open `http://localhost:3002`
+3. Click **Connect Gmail** in the sidebar and authorize via the Scalekit OAuth flow
+4. Paste a Google Meet link into **Join a meeting** and click **Send bot**
+5. Talk in the meeting — transcript appears live in the dashboard
+6. End the meeting — bot leaves, transcript is fetched, Gmail follow-up fires automatically
+7. Click **Generate summary** for a GPT-4o summary
+8. Type a name and click **Generate brief** for a late-joiner catchup
 
-### 3. Entry point in code
+> Google Meet works out of the box. Zoom requires Zoom OAuth configured in the MeetStream dashboard.
 
-| File | Role |
-|------|------|
-| `app/server.py` | Builds the FastAPI app, static files, `.env` load |
-| `app/routes/websockets.py` | Route map: `/bridge`, `/bridge/audio`, optional debug UI |
+---
 
-You rarely edit `server.py` unless you add middleware or new HTTP routes.
+## What works
 
-**4. What to open first (by goal)**  
+| Feature | Status |
+|---|---|
+| Send bot from dashboard | Working |
+| Bot status updates (joining / inmeeting / stopped) | Working |
+| Live transcript in dashboard | Working |
+| Generate summary (GPT-4o) | Working — needs `OPENAI_API_KEY` |
+| Late joiner brief (GPT-4o) | Working — needs `OPENAI_API_KEY` |
+| Connect Gmail from dashboard | Working |
+| Gmail follow-up email | Working — needs Gmail connected |
+| Real-time in-meeting AI agent (bridge) | Working — needs `OPENAI_API_KEY` |
+| Google Calendar event creation | Stub — needs `execute_tool` call filled in |
+| Post-call action item extraction | Stub — dispatcher receives `{}` until wired in |
 
-| Goal | Open first |
-|------|------------|
-| Change how the AI talks, tools, or MCP | `app/agent.py` |
-| Change MeetStream audio decoding / speaker filtering | `app/meetstream/audio.py`, `app/meetstream/config.py` |
-| Change what we send back to the meeting (audio/chat/interrupt JSON) | `app/meetstream/outbound.py` |
-| Wire meeting audio ↔ model ↔ outbound commands | `app/realtime/pipeline.py` (`RealtimeMeetingBridge`) |
-| See raw WebSocket receive loops | `app/meetstream/ws_handlers.py` |
+---
 
-**5. Reading order for different levels**  
-- **New to the repo:** this README → **Repository layout** (below) → skim `app/realtime/pipeline.py` (the “glue” class).  
-- **Comfortable with FastAPI:** `app/routes/` → `app/meetstream/` → `app/realtime/pipeline.py`.  
-- **MCP setup (Canva, JSON config):** [docs/mcp.md](docs/mcp.md) → then [README.agents.md](README.agents.md) for advanced agent/provider topics.
+## What still needs to be done
 
-The layout is intentional: **MeetStream wire format** lives under `app/meetstream/`, **OpenAI Realtime + pump** under `app/realtime/`, **persona and tools** in `app/agent.py`. That matches the official docs split ([audio streaming](https://docs.meetstream.ai/guides/get-started/real-time-audio-streaming) vs [control commands](https://docs.meetstream.ai/guides/get-started/meeting-control-and-command-patterns)) plus a single orchestrator in `pipeline.py`.
+### 1. Wire in action item extraction
 
-## What this server does
+`server.py` currently passes `{}` to the dispatcher. Swap it out once an extraction function exists:
 
-| Endpoint | Direction | Purpose |
-|----------|-----------|---------|
-| `GET /health` | — | Liveness check |
-| `GET /` | — | Optional demo UI (`app/static/`) |
-| `WebSocket /bridge` (or `/{bot_id}/bridge`) | MeetStream ↔ you | JSON control: handshake, `usermsg`, `interrupt`; outbound `sendaudio`, `sendmsg`, etc. |
-| `WebSocket /bridge/audio` (or `/{bot_id}/bridge/audio`) | MeetStream → you | Binary frames (current protocol) or legacy JSON `PCMChunk` |
+```python
+# In server.py, replace:
+await dispatcher.dispatch({})
 
-The bridge keeps **one OpenAI Realtime session per `bot_id`**. The session is created when the first channel connects and is torn down when **both** WebSockets have disconnected, matching the docs.
-
-### Repository layout
-
-| Path | Role |
-|------|------|
-| `app/server.py` | FastAPI app factory, static mount, `.env` load |
-| `app/routes/` | HTTP (`/`, `/health`) and WebSocket route declarations |
-| `app/meetstream/` | MeetStream wire format: binary audio decode, resampling, speaker filter, outbound JSON commands, `/bridge` receive loops |
-| `app/realtime/` | OpenAI Realtime session lifecycle, MCP preconnect, event serialization, model → MeetStream pump (`RealtimeMeetingBridge`) |
-| `app/agent.py` | `RealtimeAgent`, tools, MCP server list (LLM-facing only) |
-| `app/static/` | Optional browser UI for local debugging |
-| `mcp.config.json` | MCP servers (default: Canva); expand with more `mcpServers` entries |
-| `docs/mcp.md` | Reference for `mcp.config.json` transports and examples |
-
-## Prerequisites
-
-- Python **3.12+**
-- [uv](https://github.com/astral-sh/uv) (recommended)
-- **OpenAI API key** (realtime / voice stack)
-- **MeetStream API key** (when you create bots/sessions via the MeetStream API—not stored in this app unless you add that yourself)
-
-## Quickstart
-
-```bash
-git clone <this-repo>
-cd meetstream-agent
-
-cp .env.example .env
-# Edit .env: set OPENAI_API_KEY
-
-uv sync
-uv run uvicorn app.server:app --host 0.0.0.0 --port 8000
+# With:
+from extraction import extract_actions
+extraction = await extract_actions(transcript)
+await dispatcher.dispatch(extraction)
 ```
 
-Or:
+Expected shape (connectors use `.get()` so partial is fine):
 
-```bash
-uv run python main.py
-```
-
-Load `.env` from the project root automatically (via `python-dotenv` in the app lifespan).
-
-## MeetStream session configuration
-
-When you create a MeetStream session (HTTP API), point both WebSockets at your deployed bridge (use `wss://` in production):
-
-```json
+```python
 {
-  "meeting_url": "https://meet.google.com/your-meeting-id",
-  "bot_name": "My Assistant",
-  "live_audio_required": {
-    "websocket_url": "wss://your-host.example.com/bridge/audio"
-  },
-  "socket_connection_url": {
-    "websocket_url": "wss://your-host.example.com/bridge"
-  }
+    "summary": "str",
+    "action_items": [{"title": "str", "owner": "str", "due": "str"}],
+    "recipient_email": "str",
+    "recipient_name": "str",
+    "participants": ["str"]
 }
 ```
 
-The same `bot_id` is sent on both channels in the `ready` handshake so this server can pair them.
+Use `sample_transcript.json` (project root) to build and test the prompt.
 
-If your MeetStream API uses URL templates with **`{bot_id}`** in the path, use the same host and paths **`wss://…/{bot_id}/bridge`** and **`wss://…/{bot_id}/bridge/audio`** — this app registers those routes as well as `/bridge` and `/bridge/audio`.
+### 2. Finish Google Calendar connector
 
-## Environment variables
+`connectors/google_calendar.py` has auth but no API call. Follow the Gmail pattern:
 
-<<<<<<< HEAD
-```sh
-# 1) install uv (see above)
-# 2) in the project folder:
-uv python install              # optional, installs the required Python
-uv sync                        # creates .venv and installs from uv.lock
-uv run python server.py        # run the app
-```
->>>>>>> dab566a (Readme, updates to the agent, Figma MCP)
-=======
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `OPENAI_API_KEY` | Yes | OpenAI API key for Realtime / Agents |
-| `PORT` | No | HTTP port (default `8000`) |
-| `MEETSTREAM_BOT_NAME` | No | Display name of your bot in the meeting; audio from this speaker is ignored (echo control) |
-| `MEETSTREAM_IGNORE_SPEAKERS` | No | Comma-separated display names to ignore |
-| `AGENT_SPEAKER_KEYWORDS` | No | Comma-separated substrings (default `bot,agent,assistant,ai`) to filter self/agent audio |
-| `MEETSTREAM_IN_RATE` / `MEETSTREAM_OUT_RATE` | No | PCM rates for MeetStream I/O (default `48000`) |
-| `MODEL_AUDIO_RATE` | No | Rate your model expects for input/output PCM in the bridge (default `24000` for OpenAI Realtime) |
-
-MeetStream **API keys** belong in whatever client or backend calls MeetStream to create sessions—not in this bridge unless you add that integration.
-
-See `.env.example` for a template.
-
-## MCP servers (Canva by default + optional Docker)
-
-### Canva (`mcp.config.json`)
-
-The repo ships **`mcp.config.json`** with a **Canva** entry (`npx mcp-remote` → Canva’s MCP). Install **Node.js** so **`npx`** is on your `PATH`.
-
-- **Disable Canva:** remove the `canva` block or rename the config file (see [docs/mcp.md](docs/mcp.md)).
-- **More MCPs in JSON:** add entries under `mcpServers` — [docs/mcp.md](docs/mcp.md).
-- **Different file:** `MCP_CONFIG=/path/to/file.json` in `.env`.
-
-### Optional Docker / streamable HTTP MCP (env toggle)
-
-Use this when your MCP runs in **Docker** (or elsewhere) and is reachable at an **HTTPS** URL (often via **ngrok**), with a **Bearer** token.
-
-1. In **`.env`** (never commit secrets):
-
-   ```env
-   DOCKER_MCP_ENABLED=1
-   DOCKER_MCP_URL=https://YOUR-NGROK-HOST/mcp
-   DOCKER_MCP_BEARER_TOKEN=YOUR_TOKEN
-   ```
-
-2. Set **`DOCKER_MCP_ENABLED=0`** (or unset) to turn this MCP off. Canva from `mcp.config.json` can stay on at the same time.
-
-3. Details and timeouts: [docs/mcp.md](docs/mcp.md).
-
-**Agent tuning, Framer/n8n via env only, multi-provider notes:** [README.agents.md](README.agents.md)
-
-## Protocol notes (aligned with MeetStream docs)
-
-- **Audio in:** Binary frames per [Live Audio Capture & Frame Decoding](https://docs.meetstream.ai/guides/get-started/real-time-audio-streaming), or legacy JSON `PCMChunk` with base64 audio.
-- **Control in:** After `{"type":"ready","bot_id":"..."}`, MeetStream may send `usermsg` and `interrupt`.
-- **Control out:** The bridge sends `command: "ack"` after binding, `sendaudio` for PCM back to the meeting, `sendmsg` for chat (includes both `message` and `msg`), and `interrupt` with `action: "clear_audio_queue"` when the model stops audio or **starts a tool** (so queued TTS does not overlap the next utterance after the tool). Outbound model audio is **batched** (default ~240 ms at the model sample rate, then resampled to 48 kHz) so MeetStream gets fewer, larger chunks than raw Realtime deltas—tune with **`MEETSTREAM_OUT_AUDIO_CHUNK_MS`** (40–2000) if playback glitches or latency feels off. Optional **`MEETSTREAM_SENDAUDIO_PACE_MS`** adds a short pause between consecutive `sendaudio` frames if the client struggles with burst traffic.
-
-## Development
-
-```bash
-uv run uvicorn app.server:app --host 0.0.0.0 --port 8000 --reload
+```python
+actions = auth.get_actions()
+result = actions.execute_tool(
+    tool_name="googlecalendar_create_event",  # confirm exact name in Scalekit dashboard
+    identifier=STUB_USER_ID,
+    tool_input={
+        "title": item.get("title"),
+        "start": item.get("due"),
+    },
+)
 ```
 
-Optional: install **SciPy** for higher-quality resampling (`scipy.signal.resample_poly`); otherwise NumPy linear interpolation is used.
+Check **Scalekit dashboard → Agent Auth → Tools** for the exact `tool_name` and input schema.
 
-## License
+### 3. Nice to have
 
-Use and modify per your open-source license (add a `LICENSE` file if this repo should ship under a specific license).
->>>>>>> f403a71 (refactor(bridge): layered MeetStream ↔ Realtime stack, MCP config, and stable TTS around tools)
+- Replace `STUB_USER_ID = "hackathon-user"` in connectors with a real user identity from the dashboard
+- Persist `bot_id → transcript_id` mapping to a file so server restarts don't lose it
+- Add more connectors (Slack, HubSpot) — just drop a file in `connectors/`, no other changes needed
+
+---
+
+## Adding a connector
+
+Drop a file in `connectors/` with an `async def run(extraction: dict)` function. The dispatcher picks it up automatically.
+
+```python
+# connectors/slack.py
+async def run(extraction: dict) -> None:
+    ...
+```
+
+---
+
+## File map
+
+```
+start.bat                  ← double-click to start all 5 services
+server.py                  ← webhook server (port 3001)
+transcript.py              ← fetches transcript from MeetStream after meeting ends
+send_bot.py                ← CLI fallback: uv run python send_bot.py "<link>"
+auth.py                    ← Scalekit client + OAuth helpers
+dispatcher.py              ← auto-discovers and runs all connectors concurrently
+connectors/
+  gmail_followup.py        ← sends follow-up email via Gmail API
+  google_calendar.py       ← stub — needs execute_tool call
+  hubspot.py               ← stub
+  slack.py                 ← stub
+backend/
+  main.py                  ← dashboard backend (port 3000), WebSocket, GPT-4o, join/auth endpoints
+dashboard/                 ← Next.js frontend (port 3002)
+app/
+  server.py                ← real-time bridge to OpenAI Realtime API (port 8000)
+sample_transcript.json     ← real transcript sample for testing extraction
+.env.example               ← copy to .env and fill in
+```

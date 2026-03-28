@@ -45,11 +45,15 @@ function TranscriptRow({ entry }: { entry: TranscriptEntry }) {
 
 export default function Dashboard() {
   const { session, connected } = useMeetingSocket();
-  const [summary,       setSummary]       = useState("");
-  const [brief,         setBrief]         = useState("");
-  const [lateJoiner,    setLateJoiner]    = useState("");
+  const [summary,        setSummary]        = useState("");
+  const [brief,          setBrief]          = useState("");
+  const [lateJoiner,     setLateJoiner]     = useState("");
   const [loadingSummary, setLoadingSummary] = useState(false);
   const [loadingBrief,   setLoadingBrief]   = useState(false);
+  const [meetingLink,    setMeetingLink]    = useState("");
+  const [joining,        setJoining]        = useState(false);
+  const [joinMsg,        setJoinMsg]        = useState("");
+  const [gmailAuth,      setGmailAuth]      = useState<{authorized: boolean; auth_link?: string; error?: string} | null>(null);
   const feedRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -60,24 +64,65 @@ export default function Dashboard() {
     if (session.summary) setSummary(session.summary);
   }, [session.summary]);
 
+  useEffect(() => {
+    fetch(`${API}/api/gmail-status`)
+      .then((r) => r.json())
+      .then(setGmailAuth)
+      .catch(() => setGmailAuth({ authorized: false, error: "Could not reach backend" }));
+  }, []);
+
+  async function joinMeeting() {
+    if (!meetingLink.trim()) return;
+    setJoining(true);
+    setJoinMsg("");
+    try {
+      const res  = await fetch(`${API}/api/join`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ meeting_link: meetingLink.trim() }),
+      });
+      const data = await res.json();
+      if (data.error) {
+        setJoinMsg(`Error: ${typeof data.error === "string" ? data.error : JSON.stringify(data.error)}`);
+      } else {
+        setJoinMsg("Bot is joining the meeting...");
+        setMeetingLink("");
+      }
+    } catch {
+      setJoinMsg("Error: could not reach backend at " + API);
+    } finally {
+      setJoining(false);
+    }
+  }
+
   async function getSummary() {
     setLoadingSummary(true);
-    const res  = await fetch(`${API}/api/summarize`, { method: "POST" });
-    const data = await res.json();
-    setSummary(data.summary);
-    setLoadingSummary(false);
+    try {
+      const res  = await fetch(`${API}/api/summarize`, { method: "POST" });
+      const data = await res.json();
+      setSummary(data.error ? `Error: ${data.error}` : data.summary);
+    } catch {
+      setSummary("Error: could not reach backend at " + API);
+    } finally {
+      setLoadingSummary(false);
+    }
   }
 
   async function getBrief() {
     setLoadingBrief(true);
-    const res  = await fetch(`${API}/api/late-joiner-brief`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: lateJoiner || "New participant" }),
-    });
-    const data = await res.json();
-    setBrief(data.brief);
-    setLoadingBrief(false);
+    try {
+      const res  = await fetch(`${API}/api/late-joiner-brief`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: lateJoiner || "New participant" }),
+      });
+      const data = await res.json();
+      setBrief(data.error ? `Error: ${data.error}` : data.brief);
+    } catch {
+      setBrief("Error: could not reach backend at " + API);
+    } finally {
+      setLoadingBrief(false);
+    }
   }
 
   const flaggedCount = session.transcript.filter((e) => e.flag_for_review).length;
@@ -109,6 +154,33 @@ export default function Dashboard() {
               {connected ? "connected" : "disconnected"}
             </span>
           </div>
+        </div>
+
+        {/* Join meeting */}
+        <div className="bg-white rounded-2xl border border-gray-100 p-4">
+          <p className="text-sm font-medium text-gray-700 mb-3">Join a meeting</p>
+          <div className="flex gap-2">
+            <input
+              className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm
+                outline-none focus:ring-2 focus:ring-violet-300"
+              placeholder="https://meet.google.com/xxx-xxxx-xxx"
+              value={meetingLink}
+              onChange={(e) => setMeetingLink(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && joinMeeting()}
+            />
+            <button
+              onClick={joinMeeting}
+              disabled={joining || !meetingLink.trim()}
+              className="px-4 py-2 text-sm bg-violet-600 text-white rounded-lg
+                hover:bg-violet-700 disabled:opacity-40 transition-colors whitespace-nowrap">
+              {joining ? "Sending..." : "Send bot"}
+            </button>
+          </div>
+          {joinMsg && (
+            <p className={`text-xs mt-2 ${joinMsg.startsWith("Error") ? "text-red-500" : "text-green-600"}`}>
+              {joinMsg}
+            </p>
+          )}
         </div>
 
         {/* Metrics */}
@@ -187,6 +259,35 @@ export default function Dashboard() {
                   hover:bg-gray-50 disabled:opacity-40 transition-colors">
                 {loadingBrief ? "Generating..." : "Generate brief"}
               </button>
+            </div>
+
+            {/* Gmail auth */}
+            <div className="bg-white rounded-2xl border border-gray-100 p-4 space-y-2">
+              <p className="text-sm font-medium text-gray-700">Gmail</p>
+              {gmailAuth === null && (
+                <p className="text-xs text-gray-400">Checking...</p>
+              )}
+              {gmailAuth?.authorized && (
+                <p className="text-xs text-green-600 font-medium">Connected</p>
+              )}
+              {gmailAuth && !gmailAuth.authorized && (
+                <>
+                  <p className="text-xs text-amber-600">Not connected</p>
+                  {gmailAuth.auth_link && (
+                    <a
+                      href={gmailAuth.auth_link}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="block w-full text-center text-xs border border-gray-200
+                        rounded-lg px-3 py-2 hover:bg-gray-50 transition-colors">
+                      Connect Gmail
+                    </a>
+                  )}
+                  {gmailAuth.error && (
+                    <p className="text-xs text-red-400">{gmailAuth.error}</p>
+                  )}
+                </>
+              )}
             </div>
 
             {/* Flagged */}
