@@ -3,7 +3,6 @@ from dotenv import load_dotenv
 from scalekit import ScalekitClient # type: ignore
 from typing import Any
 
-load_dotenv()
 
 scalekit_client = ScalekitClient(
     client_id=os.getenv("SCALEKIT_CLIENT_ID"),
