@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(winget list:*)",
+      "Bash(pip show:*)",
+      "Bash(pip install:*)",
+      "Bash(python -m uv init --no-readme)",
+      "Bash(python -m uv add fastapi uvicorn httpx python-dotenv)"
+    ]
+  }
+}
