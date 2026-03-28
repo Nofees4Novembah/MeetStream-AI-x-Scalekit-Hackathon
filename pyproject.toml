@@ -1,12 +1,26 @@
 [project]
-name = "meetstream-ai-x-scalekit-hackathon"
-version = "0.1.0"
-description = "Add your description here"
-requires-python = ">=3.13"
+name = "meetstream-bridge"
+version = "0.2.0"
+description = "Open-source MeetStream ↔ OpenAI Realtime bridge (FastAPI WebSockets)"
+readme = "README.md"
+requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.135.2",
     "httpx>=0.28.1",
+    "ipython>=9.5.0",
+    "numpy>=2.0.0",
+    "openai-agents[voice]>=0.2.11",
     "python-dotenv>=1.2.2",
     "scalekit-sdk-python>=2.4.13",
     "uvicorn>=0.42.0",
+    "websockets>=15.0.1",
 ]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.0.2",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]

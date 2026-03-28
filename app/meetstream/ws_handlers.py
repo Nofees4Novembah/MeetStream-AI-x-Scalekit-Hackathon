@@ -20,26 +20,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger("bridge.meetstream.ws")
 
-import httpx
-import asyncio
-
-TRANSCRIPT_BACKEND_URL = "http://localhost:3000/internal/transcript"
-
-async def forward_transcript(speaker: str, text: str, timestamp: str, words: list):
-    try:
-        async with httpx.AsyncClient() as client:
-            await client.post(
-                TRANSCRIPT_BACKEND_URL,
-                json={
-                    "speakerName": speaker,
-                    "transcript": text,
-                    "timestamp": timestamp,
-                    "words": words,
-                },
-                timeout=3,
-            )
-    except Exception:
-        pass
 
 async def control_channel_loop(ws: WebSocket, pipeline: RealtimeMeetingBridge) -> None:
     """JSON control socket: ``ready`` handshake, then ``usermsg`` / ``interrupt``."""
@@ -62,13 +42,6 @@ async def control_channel_loop(ws: WebSocket, pipeline: RealtimeMeetingBridge) -
                 msg = data.get("message", "")
                 if msg:
                     await pipeline.ingest_user_text(bot_id, msg)
-                    # Forward transcript to dashboard backend
-                    asyncio.create_task(forward_transcript(
-                        speaker=data.get("speakerName", "Unknown"),
-                        text=msg,
-                        timestamp=data.get("timestamp", ""),
-                        words=data.get("words", []),
-                    ))
             elif cmd == "interrupt":
                 await pipeline.interrupt_model(bot_id)
 
