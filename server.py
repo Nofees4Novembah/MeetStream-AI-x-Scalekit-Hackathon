@@ -8,6 +8,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from transcript import fetch_transcript
+from extraction import extract_actions
 import dispatcher
 
 app = FastAPI()
@@ -74,11 +75,18 @@ async def meetstream_webhook(request: Request) -> JSONResponse:
         else:
             log("WEBHOOK", f"Resolved transcript_id={transcript_id} for bot_id={bot_id}, fetching...")
             transcript = await fetch_transcript(transcript_id)
-            print(json.dumps(transcript, indent=2))
             await push_transcript(transcript)
-            # TODO: swap {} for real extraction output once Person 2 is ready
-            # e.g. extraction = await extract_actions(transcript)
-            await dispatcher.dispatch({})
+            extraction = await extract_actions(transcript)
+            # Pull recipient email set via dashboard
+            try:
+                async with httpx.AsyncClient() as client:
+                    resp = await client.get(f"{BACKEND_URL}/api/session", timeout=5)
+                    recipient_email = resp.json().get("recipient_email", "")
+                    if recipient_email:
+                        extraction["recipient_email"] = recipient_email
+            except Exception:
+                pass
+            await dispatcher.dispatch(extraction)
     else:
         log("WEBHOOK", f"Unhandled event type '{event_type}': {json.dumps(payload)}")
 
