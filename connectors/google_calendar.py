@@ -7,8 +7,6 @@ extraction schema, replace the TODO comments with real field access.
 
 import auth
 
-
-# TODO: replace with real user identity once Person 4's dashboard provides it
 STUB_USER_ID = "hackathon-user"
 
 
@@ -20,16 +18,77 @@ async def run(extraction: dict) -> None:
         print(f"[CONNECTOR:google_calendar] User not authorized. Auth link: {auth_status['auth_link']}")
         return
 
-    # TODO: swap stub for real extraction fields once Person 2 finalises schema
-    # Expected something like:
-    #   extraction["action_items"] -> list of {"title": str, "owner": str, "due": str}
-    action_items = extraction.get("action_items", [])
+    raw_action_items = extraction.get("action_items")
+    if raw_action_items is None:
+        raw_action_items = extraction.get("actions")
+    if raw_action_items is None:
+        raw_action_items = extraction.get("tasks")
+    if raw_action_items is None:
+        raw_action_items = extraction.get("actionItems")
+
+    if not isinstance(raw_action_items, list):
+        raw_action_items = []
+
+    action_items = []
+    for item in raw_action_items:
+        if not isinstance(item, dict):
+            continue
+
+        title = (
+            item.get("title")
+            or item.get("task")
+            or item.get("name")
+            or item.get("description")
+            or ""
+        )
+        owner = (
+            item.get("owner")
+            or item.get("assignee")
+            or item.get("person")
+            or item.get("participant")
+            or ""
+        )
+        due = (
+            item.get("due")
+            or item.get("due_date")
+            or item.get("deadline")
+            or item.get("date")
+            or ""
+        )
+
+        if title:
+            action_items.append({
+                "title": title,
+                "owner": owner,
+                "due": due,
+            })
 
     if not action_items:
         print("[CONNECTOR:google_calendar] No action items to schedule")
         return
 
+    actions = auth.get_actions()
+
     for item in action_items:
-        print(f"[CONNECTOR:google_calendar] Would create event: {item}")
-        # TODO: call Scalekit actions API to create calendar event
-        # e.g. auth.actions.create_event(connection_name="googlecalendar", ...)
+        title = item["title"]
+        owner = item["owner"]
+        due = item["due"]
+
+        event_title = f"{title}" + (f" — {owner}" if owner else "")
+        start_datetime = due if due else "2026-03-29T09:00:00Z"
+
+        try:
+            result = actions.execute_tool(
+                tool_name="googlecalendar_create_event",
+                identifier=STUB_USER_ID,
+                tool_input={
+                    "summary": event_title,
+                    "start_datetime": start_datetime,
+                    "event_duration_minutes": 30,
+                    "description": f"Action item from meeting.\nOwner: {owner}\nDue: {due}",
+                    "timezone": "America/Los_Angeles",
+                },
+            )
+            print(f"[CONNECTOR:google_calendar] Created event '{event_title}' (execution_id={result.execution_id})")
+        except Exception as e:
+            print(f"[CONNECTOR:google_calendar] Failed to create event '{event_title}': {e}")
