@@ -44,7 +44,7 @@ function TranscriptRow({ entry }: { entry: TranscriptEntry }) {
 }
 
 export default function Dashboard() {
-  const { session, connected } = useMeetingSocket();
+  const { session, connected, emailSentWs } = useMeetingSocket();
   const [summary,        setSummary]        = useState("");
   const [brief,          setBrief]          = useState("");
   const [lateJoiner,     setLateJoiner]     = useState("");
@@ -55,6 +55,9 @@ export default function Dashboard() {
   const [joining,        setJoining]        = useState(false);
   const [joinMsg,        setJoinMsg]        = useState("");
   const [gmailAuth,      setGmailAuth]      = useState<{authorized: boolean; auth_link?: string; error?: string} | null>(null);
+  const [gcalAuth,       setGcalAuth]       = useState<{authorized: boolean; auth_link?: string; error?: string} | null>(null);
+  const [slackAuth,      setSlackAuth]      = useState<{authorized: boolean; auth_link?: string; error?: string} | null>(null);
+  const [emailSent,      setEmailSent]      = useState<{to: string; at: string} | null>(null);
   const feedRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -66,10 +69,17 @@ export default function Dashboard() {
   }, [session.summary]);
 
   useEffect(() => {
-    fetch(`${API}/api/gmail-status`)
-      .then((r) => r.json())
-      .then(setGmailAuth)
-      .catch(() => setGmailAuth({ authorized: false, error: "Could not reach backend" }));
+    if (emailSentWs) setEmailSent(emailSentWs);
+  }, [emailSentWs]);
+
+  useEffect(() => {
+    const fetchAuth = (endpoint: string, setter: (v: any) => void) =>
+      fetch(`${API}${endpoint}`).then((r) => r.json()).then(setter).catch(() => setter({ authorized: false, error: "Could not reach backend" }));
+    fetchAuth("/api/gmail-status", setGmailAuth);
+    fetchAuth("/api/gcal-status",  setGcalAuth);
+    fetchAuth("/api/slack-status", setSlackAuth);
+    // Load any email already sent this session
+    fetch(`${API}/api/session`).then((r) => r.json()).then((s) => { if (s.email_sent) setEmailSent(s.email_sent); }).catch(() => {});
   }, []);
 
   async function joinMeeting() {
@@ -278,32 +288,34 @@ export default function Dashboard() {
               </button>
             </div>
 
-            {/* Gmail auth */}
-            <div className="bg-white rounded-2xl border border-gray-100 p-4 space-y-2">
-              <p className="text-sm font-medium text-gray-700">Gmail</p>
-              {gmailAuth === null && (
-                <p className="text-xs text-gray-400">Checking...</p>
-              )}
-              {gmailAuth?.authorized && (
-                <p className="text-xs text-green-600 font-medium">Connected</p>
-              )}
-              {gmailAuth && !gmailAuth.authorized && (
-                <>
-                  <p className="text-xs text-amber-600">Not connected</p>
-                  {gmailAuth.auth_link && (
-                    <a
-                      href={gmailAuth.auth_link}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="block w-full text-center text-xs border border-gray-200
-                        rounded-lg px-3 py-2 hover:bg-gray-50 transition-colors">
-                      Connect Gmail
-                    </a>
+            {/* Connections */}
+            <div className="bg-white rounded-2xl border border-gray-100 p-4 space-y-3">
+              <p className="text-sm font-medium text-gray-700">Connections</p>
+              {([
+                { label: "Gmail",            state: gmailAuth,  name: "Gmail"            },
+                { label: "Google Calendar",  state: gcalAuth,   name: "Google Calendar"  },
+                { label: "Slack",            state: slackAuth,  name: "Slack"            },
+              ] as const).map(({ label, state, name }) => (
+                <div key={label} className="flex items-center justify-between">
+                  <span className="text-xs text-gray-600">{label}</span>
+                  {state === null && <span className="text-xs text-gray-400">Checking...</span>}
+                  {state?.authorized && <span className="text-xs text-green-600 font-medium">Connected</span>}
+                  {state && !state.authorized && (
+                    state.auth_link
+                      ? <a href={state.auth_link} target="_blank" rel="noreferrer"
+                          className="text-xs text-violet-600 hover:underline">Connect</a>
+                      : <span className="text-xs text-red-400">{state.error ?? "Not connected"}</span>
                   )}
-                  {gmailAuth.error && (
-                    <p className="text-xs text-red-400">{gmailAuth.error}</p>
-                  )}
-                </>
+                </div>
+              ))}
+
+              {/* Email sent status */}
+              {emailSent && (
+                <div className="pt-2 border-t border-gray-100">
+                  <p className="text-xs text-gray-400">Last email sent</p>
+                  <p className="text-xs text-gray-700 mt-0.5 truncate">to {emailSent.to}</p>
+                  <p className="text-xs text-gray-400">{emailSent.at}</p>
+                </div>
               )}
             </div>
 

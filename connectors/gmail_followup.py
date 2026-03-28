@@ -7,11 +7,14 @@ execute_tool exists in this Scalekit environment.
 """
 
 import base64
+import os
 from email.mime.text import MIMEText
 
 import httpx
 
 import auth
+
+BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:3000")
 
 STUB_USER_ID = "hackathon-user"
 GMAIL_SEND_URL = "https://gmail.googleapis.com/gmail/v1/users/me/messages/send"
@@ -89,6 +92,11 @@ async def run(extraction: dict) -> None:
 
         if resp.status_code == 200:
             print(f"[GMAIL] Follow-up email sent to {recipient}")
+            try:
+                async with httpx.AsyncClient() as cb:
+                    await cb.post(f"{BACKEND_URL}/internal/email-sent", json={"to": recipient}, timeout=5)
+            except Exception:
+                pass
         else:
             print(f"[GMAIL] Gmail API error {resp.status_code}: {resp.text}")
     except Exception as e:

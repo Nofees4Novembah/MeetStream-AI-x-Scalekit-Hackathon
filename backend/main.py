@@ -36,6 +36,7 @@ session = {
     "word_count": 0,
     "start_time": None,
     "recipient_email": "",
+    "email_sent": None,   # {"to": "...", "at": "..."} once sent
 }
 
 # ── WebSocket manager ────────────────────────────────────────────────────────
@@ -183,17 +184,37 @@ async def join_meeting(request: Request):
     return {"ok": True, "bot_id": bot_id}
 
 
-# ── Gmail auth status ─────────────────────────────────────────────────────────
-@app.get("/api/gmail-status")
-async def gmail_status():
+# ── Auth status endpoints ─────────────────────────────────────────────────────
+def _auth_status(connection_name: str) -> dict:
     try:
-        authorized = auth.is_authorized(STUB_USER_ID, connection_name="gmail")
+        authorized = auth.is_authorized(STUB_USER_ID, connection_name=connection_name)
         if authorized:
             return {"authorized": True}
-        link = auth.get_auth_link(STUB_USER_ID, connection_name="gmail")
+        link = auth.get_auth_link(STUB_USER_ID, connection_name=connection_name)
         return {"authorized": False, "auth_link": link}
     except Exception as e:
         return {"authorized": False, "error": str(e)}
+
+@app.get("/api/gmail-status")
+async def gmail_status():
+    return _auth_status("gmail")
+
+@app.get("/api/gcal-status")
+async def gcal_status():
+    return _auth_status("googlecalendar")
+
+@app.get("/api/slack-status")
+async def slack_status():
+    return _auth_status("slack")
+
+# ── Email sent callback (called by Gmail connector) ───────────────────────────
+@app.post("/internal/email-sent")
+async def email_sent(request: Request):
+    body = await request.json()
+    record = {"to": body.get("to", ""), "at": datetime.utcnow().strftime("%H:%M")}
+    session["email_sent"] = record
+    await manager.broadcast({"type": "email_sent", "email_sent": record})
+    return {"ok": True}
 
 
 # ── Recipient email ──────────────────────────────────────────────────────────

@@ -27,7 +27,15 @@ Bridge (port 8000) — real-time AI voice agent inside the meeting
 
 ## Starting everything
 
-Double-click **`start.bat`** — opens all 5 services in labeled terminal windows.
+**Windows:** double-click `start.bat`
+
+**Mac:**
+```bash
+chmod +x start.sh   # only needed once after cloning
+./start.sh
+```
+
+Both open all 5 services in separate terminal windows.
 
 `WEBHOOK_BASE_URL` in `.env` is your ngrok URL — it stays the same across restarts so you don't need to change it.
 
@@ -137,7 +145,8 @@ The `extraction` dict shape:
 ## File map
 
 ```
-start.bat                  ← double-click to start all 5 services
+start.bat                  ← Windows: double-click to start all 5 services
+start.sh                   ← Mac: ./start.sh
 server.py                  ← webhook server (port 3001)
 extraction.py              ← GPT-4o post-call extraction
 transcript.py              ← fetches transcript from MeetStream after meeting ends
