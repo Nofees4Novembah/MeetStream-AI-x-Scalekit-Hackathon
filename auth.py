@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 from scalekit import ScalekitClient
 from typing import Any
 
+load_dotenv()
 
 _scalekit_client = None
 
@@ -42,6 +43,7 @@ def get_scalekit_client() -> ScalekitClient:
     )
     return _scalekit_client
 
+
 class _ActionsProxy:
     """
     Proxy object exposing the `actions` of the lazily created ScalekitClient.
@@ -52,30 +54,40 @@ class _ActionsProxy:
 
 
 actions = _ActionsProxy()
-def connect_user(user_id: str) -> Any:
+
+
+def get_actions() -> Any:
+    """Return the Scalekit actions client for making proxied API calls."""
+    return get_scalekit_client().actions
+
+
+def connect_user(user_id: str, connection_name: str = "googlecalendar") -> Any:
     response = actions.get_or_create_connected_account(
-        connection_name="googlecalendar",
+        connection_name=connection_name,
         identifier=user_id
     )
     return response.connected_account
 
-def get_auth_link(user_id: str) -> Any:
+
+def get_auth_link(user_id: str, connection_name: str = "googlecalendar") -> Any:
     link_response = actions.get_authorization_link(
-        connection_name="googlecalendar",
+        connection_name=connection_name,
         identifier=user_id
     )
     return link_response.link
 
-def is_authorized(user_id: str) -> bool:
-    account = connect_user(user_id)
+
+def is_authorized(user_id: str, connection_name: str = "googlecalendar") -> bool:
+    account = connect_user(user_id, connection_name)
     return account.status == "ACTIVE"
 
-def ensure_authorized(user_id: str) -> Any:
-    account = connect_user(user_id)
+
+def ensure_authorized(user_id: str, connection_name: str = "googlecalendar") -> Any:
+    account = connect_user(user_id, connection_name)
 
     if account.status != "ACTIVE":
-        link = get_auth_link(user_id)
-        print(f"User {user_id} needs to authorize. Send them this link:")
+        link = get_auth_link(user_id, connection_name)
+        print(f"User {user_id} needs to authorize {connection_name}. Send them this link:")
         print(link)
         return {"authorized": False, "auth_link": link}
 

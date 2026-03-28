@@ -12,7 +12,11 @@
       "Bash(python -m uv pip install scalekit --dry-run)",
       "WebFetch(domain:pypi.org)",
       "WebSearch",
-      "Bash(python -m uv add scalekit-sdk-python)"
+      "Bash(python -m uv add scalekit-sdk-python)",
+      "Bash(find C:UsersquinnDocumentsmeetstream-hackathonMeetStream-AI-x-Scalekit-Hackathon.venv -type d -name *scalekit*)",
+      "Bash(grep -E \"\\\\.\\(py\\)$\")",
+      "Bash(xargs grep:*)",
+      "Bash(find C:UsersquinnDocumentsmeetstream-hackathonMeetStream-AI-x-Scalekit-Hackathon -type f \\\\\\(-name *.md -o -name *.txt -o -name example* -o -name demo* \\\\\\))"
     ]
   }
 }
