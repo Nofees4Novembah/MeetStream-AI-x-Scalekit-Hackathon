@@ -526,7 +526,7 @@ async def meetstream_control_bind(websocket: WebSocket):
 
 # ----- 3) Meetstream audio ingest channel ---------------------------------------
 @app.websocket("/bridge/audio")
-async def meetstream_audio_bind(websocket: WebSocket):
+async def  meetstream_audio_bind(websocket: WebSocket):
     await websocket.accept()
     bot_id = None
     try:
