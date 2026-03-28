@@ -68,7 +68,7 @@ def get_auth_link(user_id: str) -> Any:
 
 def is_authorized(user_id: str) -> bool:
     account = connect_user(user_id)
-    return bool(account.status == "ACTIVE")
+    return account.status == "ACTIVE"
 
 def ensure_authorized(user_id: str) -> Any:
     account = connect_user(user_id)
