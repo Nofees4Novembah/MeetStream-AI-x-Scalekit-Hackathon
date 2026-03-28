@@ -17,14 +17,21 @@ Layout
 
 from __future__ import annotations
 
+import asyncio
+import base64
+import json
+import logging
 import os
+import struct
 from contextlib import asynccontextmanager
+from typing import Any, Dict, Optional
 
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.websockets import WebSocketDisconnect, WebSocketState
 from typing_extensions import assert_never
-from starlette.websockets import WebSocketState
 
 # === Your realtime agent stack ===
 # Uses the exact imports you showed in server.py
@@ -564,11 +571,9 @@ async def meetstream_audio_bind(websocket: WebSocket):
 
 
 # ----- Static UI (optional) ------------------------------------------------------
-app.mount("/", StaticFiles(directory="static", html=True), name="static")
-
 @app.get("/")
 async def index():
-    return FileResponse("static/index.html")
+    return FileResponse("app/static/index.html")
 
 # ----- Entrypoint ----------------------------------------------------------------
 if __name__ == "__main__":
