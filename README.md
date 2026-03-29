@@ -96,7 +96,7 @@ BACKEND_URL=http://localhost:3000
 | Gmail follow-up email | Ready | Gmail connected via dashboard + recipient email entered |
 | Google Calendar events | Ready | Google Calendar connected via Scalekit |
 | Slack summary | Ready (unverified) | Slack connected via Scalekit — `slack_send_message` tool name not yet confirmed |
-| HubSpot | Silently skips | Needs `hubspot_contact_id` + `deal_name` — not extracted from a normal meeting |
+| HubSpot | Ready | Needs HubSpot connected via Scalekit. Creates a deal using company/project name from the transcript. Contact update requires a `hubspot_contact_id` (skipped if not present). |
 
 ---
 

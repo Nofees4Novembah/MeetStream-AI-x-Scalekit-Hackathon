@@ -66,14 +66,22 @@ async def meetstream_webhook(request: Request) -> JSONResponse:
         log("WEBHOOK", "Meeting ended, waiting for transcript...")
         await push_status("stopped")
     elif event_type == "transcription.processed":
-        # Log full payload so we can confirm field names from the real response
         log("WEBHOOK", f"transcription.processed full payload: {json.dumps(payload, indent=2)}")
-        bot_id = payload.get("data", {}).get("bot_id") or payload.get("bot_id")
-        transcript_id = bot_transcript_map.get(bot_id)
+        data = payload.get("data", {})
+        bot_id = data.get("bot_id") or payload.get("bot_id")
+
+        # Prefer transcript_id from the payload itself; fall back to the in-memory map.
+        # This makes dispatch resilient to server restarts that wipe the map.
+        transcript_id = (
+            data.get("transcript_id")
+            or payload.get("transcript_id")
+            or bot_transcript_map.get(bot_id)
+        )
+
         if not transcript_id:
-            log("WEBHOOK", f"No transcript_id registered for bot_id={bot_id}, cannot fetch transcript")
+            log("WEBHOOK", f"No transcript_id found for bot_id={bot_id} — payload keys: {list(data.keys())}")
         else:
-            log("WEBHOOK", f"Resolved transcript_id={transcript_id} for bot_id={bot_id}, fetching...")
+            log("WEBHOOK", f"Fetching transcript_id={transcript_id} for bot_id={bot_id}")
             transcript = await fetch_transcript(transcript_id)
             await push_transcript(transcript)
             extraction = await extract_actions(transcript)
@@ -110,4 +118,4 @@ async def health() -> JSONResponse:
 
 
 if __name__ == "__main__":
-    uvicorn.run("server:app", host="0.0.0.0", port=3001, reload=True)
+    uvicorn.run("server:app", host="0.0.0.0", port=3001, reload=False)

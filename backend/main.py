@@ -207,6 +207,10 @@ async def gcal_status():
 async def slack_status():
     return _auth_status("slack")
 
+@app.get("/api/hubspot-status")
+async def hubspot_status():
+    return _auth_status("hubspot")
+
 # ── Email sent callback (called by Gmail connector) ───────────────────────────
 @app.post("/internal/email-sent")
 async def email_sent(request: Request):

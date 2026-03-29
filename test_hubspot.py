@@ -11,14 +11,13 @@ import auth
 from connectors.hubspot import run, STUB_USER_ID
 
 TEST_EXTRACTION = {
-    "hubspot_contact_id": "462551339707",  # fill in before running
+    "hubspot_contact_id": "462551339707",  # replace with a real contact ID from HubSpot → Contacts
     "deal_name": "Q2 Follow-up Deal",
     "deal_amount": 5000,
     "deal_stage": "appointmentscheduled",
     "summary": "We discussed the Q2 roadmap and assigned action items.",
     "action_items": [
-        {"title": "Follow up with client", "owner": "Quinn", "due": "2026-03-30"},
-        {"title": "Set up staging environment", "owner": "Nafis", "due": "2026-03-31"},
+        {"title": "Follow up with client", "owner": "Quinn", "due": "2026-04-01"},
     ],
     "participants": ["Quinn", "Nafis"],
 }

@@ -57,6 +57,7 @@ export default function Dashboard() {
   const [gmailAuth,      setGmailAuth]      = useState<{authorized: boolean; auth_link?: string; error?: string} | null>(null);
   const [gcalAuth,       setGcalAuth]       = useState<{authorized: boolean; auth_link?: string; error?: string} | null>(null);
   const [slackAuth,      setSlackAuth]      = useState<{authorized: boolean; auth_link?: string; error?: string} | null>(null);
+  const [hubspotAuth,    setHubspotAuth]    = useState<{authorized: boolean; auth_link?: string; error?: string} | null>(null);
   const [emailSent,      setEmailSent]      = useState<{to: string; at: string} | null>(null);
   const feedRef = useRef<HTMLDivElement>(null);
 
@@ -75,9 +76,10 @@ export default function Dashboard() {
   useEffect(() => {
     const fetchAuth = (endpoint: string, setter: (v: any) => void) =>
       fetch(`${API}${endpoint}`).then((r) => r.json()).then(setter).catch(() => setter({ authorized: false, error: "Could not reach backend" }));
-    fetchAuth("/api/gmail-status", setGmailAuth);
-    fetchAuth("/api/gcal-status",  setGcalAuth);
-    fetchAuth("/api/slack-status", setSlackAuth);
+    fetchAuth("/api/gmail-status",    setGmailAuth);
+    fetchAuth("/api/gcal-status",     setGcalAuth);
+    fetchAuth("/api/slack-status",    setSlackAuth);
+    fetchAuth("/api/hubspot-status",  setHubspotAuth);
     // Load any email already sent this session
     fetch(`${API}/api/session`).then((r) => r.json()).then((s) => { if (s.email_sent) setEmailSent(s.email_sent); }).catch(() => {});
   }, []);
@@ -180,8 +182,8 @@ export default function Dashboard() {
           <p className="text-sm font-medium text-gray-700 mb-3">Join a meeting</p>
           <div className="flex gap-2 mb-2">
             <input
-              className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm
-                outline-none focus:ring-2 focus:ring-violet-300"
+              className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900
+                placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-violet-400 focus:border-violet-400"
               placeholder="https://meet.google.com/xxx-xxxx-xxx"
               value={meetingLink}
               onChange={(e) => setMeetingLink(e.target.value)}
@@ -196,8 +198,8 @@ export default function Dashboard() {
             </button>
           </div>
           <input
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm
-              outline-none focus:ring-2 focus:ring-violet-300"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900
+              placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-violet-400 focus:border-violet-400"
             placeholder="Follow-up email recipient (optional)"
             type="email"
             value={recipientEmail}
@@ -270,8 +272,8 @@ export default function Dashboard() {
             <div className="bg-white rounded-2xl border border-gray-100 p-4 space-y-3">
               <p className="text-sm font-medium text-gray-700">Late joiner brief</p>
               <input
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm
-                  outline-none focus:ring-2 focus:ring-violet-300"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900
+                  placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-violet-400 focus:border-violet-400"
                 placeholder="Participant name"
                 value={lateJoiner}
                 onChange={(e) => setLateJoiner(e.target.value)}
@@ -292,10 +294,11 @@ export default function Dashboard() {
             <div className="bg-white rounded-2xl border border-gray-100 p-4 space-y-3">
               <p className="text-sm font-medium text-gray-700">Connections</p>
               {([
-                { label: "Gmail",            state: gmailAuth,  name: "Gmail"            },
-                { label: "Google Calendar",  state: gcalAuth,   name: "Google Calendar"  },
-                { label: "Slack",            state: slackAuth,  name: "Slack"            },
-              ] as const).map(({ label, state, name }) => (
+                { label: "Gmail",           state: gmailAuth   },
+                { label: "Google Calendar", state: gcalAuth    },
+                { label: "Slack",           state: slackAuth   },
+                { label: "HubSpot",         state: hubspotAuth },
+              ] as const).map(({ label, state }) => (
                 <div key={label} className="flex items-center justify-between">
                   <span className="text-xs text-gray-600">{label}</span>
                   {state === null && <span className="text-xs text-gray-400">Checking...</span>}

@@ -40,6 +40,8 @@ Given the transcript below, extract:
 1. A 2-3 sentence summary of the meeting
 2. A list of action items (things someone agreed to do)
 3. The most appropriate recipient for a follow-up email (pick the main organizer or decision-maker)
+4. If a company, client, project, or deal is mentioned, extract it as deal_name (otherwise use null)
+5. The deal stage if determinable: one of "appointmentscheduled", "qualifiedtobuy", "presentationscheduled", "decisionmakerboughtin", "contractsent", "closedwon", "closedlost" — or null if not a sales meeting
 
 Return ONLY valid JSON in this exact format:
 {{
@@ -48,7 +50,9 @@ Return ONLY valid JSON in this exact format:
     {{"title": "string", "owner": "string", "due": "string or empty"}}
   ],
   "recipient_name": "string",
-  "recipient_email": ""
+  "recipient_email": "",
+  "deal_name": "string or null",
+  "deal_stage": "string or null"
 }}
 
 Transcript:
